@@ -15,6 +15,10 @@ import { checkPermissions } from "../../lib/permissions";
 import { getMapResults, MapResult } from "../../lib/map-utils";
 import { v4 as uuidv4 } from "uuid";
 import { isBaseDomain, extractBaseDomain } from "../../lib/url-utils";
+import {
+  featureDisabledBody,
+  isMapDisabled,
+} from "../../lib/feature-flags";
 
 configDotenv();
 
@@ -22,6 +26,10 @@ export async function mapController(
   req: RequestWithAuth<{}, MapResponse, MapRequest>,
   res: Response<MapResponse>,
 ) {
+  if (isMapDisabled()) {
+    return res.status(403).json(featureDisabledBody("map"));
+  }
+
   const logger = _logger.child({
     jobId: uuidv4(),
     teamId: req.auth.team_id,

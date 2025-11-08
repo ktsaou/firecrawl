@@ -1,4 +1,4 @@
-import express from "express";
+import express, { RequestHandler } from "express";
 import { RateLimiterMode } from "../types";
 import expressWs from "express-ws";
 import { searchController } from "../controllers/v2/search";
@@ -33,6 +33,11 @@ import { creditUsageHistoricalController } from "../controllers/v2/credit-usage-
 import { tokenUsageHistoricalController } from "../controllers/v2/token-usage-historical";
 import { paymentMiddleware } from "x402-express";
 import { facilitator } from "@coinbase/x402";
+import {
+  featureDisabledBody,
+  isCrawlDisabled,
+  isMapDisabled,
+} from "../lib/feature-flags";
 
 expressWs(express());
 
@@ -155,6 +160,20 @@ v2Router.use(
     facilitator,
   ),
 );
+
+const crawlDisabledHandler: RequestHandler = (_req, res) =>
+  res.status(403).json(featureDisabledBody("crawl"));
+
+const mapDisabledHandler: RequestHandler = (_req, res) =>
+  res.status(403).json(featureDisabledBody("map"));
+
+if (isCrawlDisabled()) {
+  v2Router.use("/crawl", crawlDisabledHandler);
+}
+
+if (isMapDisabled()) {
+  v2Router.use("/map", mapDisabledHandler);
+}
 
 v2Router.post(
   "/search",
