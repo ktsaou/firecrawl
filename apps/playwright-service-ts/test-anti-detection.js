@@ -4,8 +4,12 @@
  */
 
 const http = require('http');
+const https = require('https');
 
 const PLAYWRIGHT_SERVICE_URL = process.env.PLAYWRIGHT_SERVICE_URL || 'http://localhost:3003';
+const SERVICE_URL = new URL(PLAYWRIGHT_SERVICE_URL);
+const SERVICE_PROTOCOL = SERVICE_URL.protocol === 'https:' ? https : http;
+const SERVICE_PORT = SERVICE_URL.port || (SERVICE_URL.protocol === 'https:' ? 443 : 80);
 
 // Test URLs that detect bots
 const TEST_URLS = [
@@ -38,8 +42,8 @@ async function testScrape(testCase) {
     });
 
     const options = {
-      hostname: new URL(PLAYWRIGHT_SERVICE_URL).hostname,
-      port: new URL(PLAYWRIGHT_SERVICE_URL).port || 3003,
+      hostname: SERVICE_URL.hostname,
+      port: SERVICE_PORT,
       path: '/scrape',
       method: 'POST',
       headers: {
@@ -48,7 +52,7 @@ async function testScrape(testCase) {
       }
     };
 
-    const req = http.request(options, (res) => {
+    const req = SERVICE_PROTOCOL.request(options, (res) => {
       let data = '';
 
       res.on('data', (chunk) => {
@@ -131,13 +135,13 @@ async function runTests() {
 async function checkHealth() {
   return new Promise((resolve, reject) => {
     const options = {
-      hostname: new URL(PLAYWRIGHT_SERVICE_URL).hostname,
-      port: new URL(PLAYWRIGHT_SERVICE_URL).port || 3003,
+      hostname: SERVICE_URL.hostname,
+      port: SERVICE_PORT,
       path: '/health',
       method: 'GET'
     };
 
-    const req = http.request(options, (res) => {
+    const req = SERVICE_PROTOCOL.request(options, (res) => {
       resolve(res.statusCode === 200);
     });
 

@@ -64,7 +64,6 @@ const initializeBrowser = async () => {
       // Additional anti-detection args
       '--disable-blink-features=AutomationControlled',
       '--disable-features=IsolateOrigins,site-per-process',
-      '--disable-web-security',
       '--disable-features=VizDisplayCompositor'
     ]
   });
@@ -247,11 +246,12 @@ app.post('/scrape', async (req: Request, res: Response) => {
     
     // Override permissions
     const originalQuery = window.navigator.permissions.query;
-    window.navigator.permissions.query = (parameters: any) => (
-      parameters.name === 'notifications' ?
-        Promise.resolve({ state: Notification.permission } as PermissionStatus) :
-        originalQuery(parameters)
-    );
+    window.navigator.permissions.query = function (parameters: any) {
+      if (parameters.name === 'notifications') {
+        return Promise.resolve({ state: Notification.permission } as PermissionStatus);
+      }
+      return originalQuery.call(window.navigator.permissions, parameters);
+    } as typeof window.navigator.permissions.query;
   });
 
   // Set headers if provided

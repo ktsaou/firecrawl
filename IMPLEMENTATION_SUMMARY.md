@@ -10,7 +10,7 @@
 - `apps/playwright-service-ts/README.md` - Updated documentation
 
 **New Files:**
-- `ANTI_BOT_SOLUTION.md` - Comprehensive solution guide
+- `QUICK_START_ANTI_BOT.md` - Comprehensive solution guide
 - `apps/playwright-service-ts/test-anti-detection.js` - Test script for validation
 
 ### 2. Key Enhancements
@@ -196,6 +196,6 @@ With these changes, Firecrawl's Playwright engine should now perform similarly t
 
 For issues or questions:
 1. Check logs: `docker-compose logs playwright-service`
-2. Review `ANTI_BOT_SOLUTION.md` for detailed troubleshooting
+2. Review `QUICK_START_ANTI_BOT.md` for detailed troubleshooting
 3. Test with detection URLs: `node test-anti-detection.js`
 4. Compare behavior with/without stealth features enabled
