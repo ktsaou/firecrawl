@@ -29,6 +29,10 @@ import {
 } from "../../services/index";
 import { MapTimeoutError } from "../../lib/error";
 import { checkPermissions } from "../../lib/permissions";
+import {
+  featureDisabledBody,
+  isMapDisabled,
+} from "../../lib/feature-flags";
 
 configDotenv();
 const redis = new Redis(process.env.REDIS_URL!);
@@ -350,6 +354,10 @@ export async function mapController(
   req: RequestWithAuth<{}, MapResponse, MapRequest>,
   res: Response<MapResponse>,
 ) {
+  if (isMapDisabled()) {
+    return res.status(403).json(featureDisabledBody("map"));
+  }
+
   // Get timing data from middleware (includes all middleware processing time)
   const middlewareStartTime =
     (req as any).requestTiming?.startTime || new Date().getTime();

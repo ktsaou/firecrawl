@@ -21,11 +21,19 @@ import { checkPermissions } from "../../lib/permissions";
 import { buildPromptWithWebsiteStructure } from "../../lib/map-utils";
 import { modifyCrawlUrl } from "../../utils/url-utils";
 import { crawlGroup } from "../../services/worker/nuq";
+import {
+  featureDisabledBody,
+  isCrawlDisabled,
+} from "../../lib/feature-flags";
 
 export async function crawlController(
   req: RequestWithAuth<{}, CrawlResponse, CrawlRequest>,
   res: Response<CrawlResponse>,
 ) {
+  if (isCrawlDisabled()) {
+    return res.status(403).json(featureDisabledBody("crawl"));
+  }
+
   const preNormalizedBody = req.body;
 
   // Check for URL modification before parsing

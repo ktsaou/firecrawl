@@ -1,4 +1,4 @@
-import express from "express";
+import express, { RequestHandler } from "express";
 import { crawlController } from "../controllers/v1/crawl";
 // import { crawlStatusController } from "../../src/controllers/v1/crawl-status";
 import { scrapeController } from "../../src/controllers/v1/scrape";
@@ -38,6 +38,11 @@ import { queueStatusController } from "../controllers/v1/queue-status";
 import { creditUsageHistoricalController } from "../controllers/v1/credit-usage-historical";
 import { tokenUsageHistoricalController } from "../controllers/v1/token-usage-historical";
 import { facilitator } from "@coinbase/x402";
+import {
+  featureDisabledBody,
+  isCrawlDisabled,
+  isMapDisabled,
+} from "../lib/feature-flags";
 
 expressWs(express());
 
@@ -111,6 +116,20 @@ v1Router.use(
     facilitator,
   ),
 );
+
+const crawlDisabledHandler: RequestHandler = (_req, res) =>
+  res.status(403).json(featureDisabledBody("crawl"));
+
+const mapDisabledHandler: RequestHandler = (_req, res) =>
+  res.status(403).json(featureDisabledBody("map"));
+
+if (isCrawlDisabled()) {
+  v1Router.use("/crawl", crawlDisabledHandler);
+}
+
+if (isMapDisabled()) {
+  v1Router.use("/map", mapDisabledHandler);
+}
 
 v1Router.post(
   "/scrape",
