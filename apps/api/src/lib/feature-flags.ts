@@ -1,4 +1,4 @@
-export type DisableableFeature = "crawl" | "map";
+type DisableableFeature = "crawl" | "map";
 
 const TRUE_STRING = "true";
 

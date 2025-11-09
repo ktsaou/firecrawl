@@ -71,6 +71,8 @@ import {
   withSpan,
   setSpanAttributes,
 } from "../../lib/otel-tracer";
+import { ScrapeJobCancelledError } from "../../scraper/scrapeURL/error";
+import { createJobCancellationWatcher } from "./job-cancellation-watcher";
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -80,7 +82,6 @@ const jobLockExtendInterval =
   Number(process.env.JOB_LOCK_EXTEND_INTERVAL) || 10000;
 const jobLockExtensionTime =
   Number(process.env.JOB_LOCK_EXTENSION_TIME) || 60000;
-
 cacheableLookup.install(http.globalAgent);
 cacheableLookup.install(https.globalAgent);
 
@@ -166,6 +167,7 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
     : undefined;
 
   const costTracking = new CostTracking();
+  const cancellationWatcher = createJobCancellationWatcher(job.id, logger);
 
   try {
     if (remainingTime !== undefined && remainingTime < 0) {
@@ -182,10 +184,13 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
       }
     }
 
+    await cancellationWatcher.throwIfCancelled();
+
     const pipeline = await Promise.race([
       startWebScraperPipeline({
         job,
         costTracking,
+        cancellationAbort: cancellationWatcher.abortInstance,
       }),
       ...(remainingTime !== undefined
         ? [
@@ -196,6 +201,8 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
           ]
         : []),
     ]);
+
+    await cancellationWatcher.throwIfCancelled();
 
     try {
       signal?.throwIfAborted();
@@ -569,16 +576,19 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
     }
 
     const isEarlyTimeout = error instanceof ScrapeJobTimeoutError;
-    const isCancelled =
+    const isParentCancelled =
       error instanceof Error &&
       error.message === "Parent crawl/batch scrape was cancelled";
+    const isClientCancelled = error instanceof ScrapeJobCancelledError;
 
     if (isEarlyTimeout) {
       logger.error(`🐂 Job timed out ${job.id}`);
     } else if (error instanceof RacedRedirectError) {
       logger.warn(`🐂 Job got redirect raced ${job.id}, silently failing`);
-    } else if (isCancelled) {
+    } else if (isParentCancelled) {
       logger.warn(`🐂 Job got cancelled, silently failing`);
+    } else if (isClientCancelled) {
+      logger.warn(`🐂 Job cancelled by client ${job.id}`);
     } else {
       logger.error(`🐂 Job errored ${job.id} - ${error}`, { error });
 
@@ -652,13 +662,15 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
     const end = Date.now();
     const timeTakenInSeconds = (end - start) / 1000;
 
-    const credits_billed = await billScrapeJob(
-      job,
-      null,
-      logger,
-      costTracking,
-      (await getACUCTeam(job.data.team_id))?.flags ?? null,
-    );
+    const credits_billed = isClientCancelled
+      ? 0
+      : await billScrapeJob(
+          job,
+          null,
+          logger,
+          costTracking,
+          (await getACUCTeam(job.data.team_id))?.flags ?? null,
+        );
 
     logger.debug("Logging job to DB...");
     await logJob(
@@ -689,6 +701,8 @@ async function processJob(job: NuQJob<ScrapeJobSingleUrls>) {
       job.data.internalOptions?.bypassBilling ?? false,
     );
     return data;
+  } finally {
+    cancellationWatcher.stop();
   }
 }
 
