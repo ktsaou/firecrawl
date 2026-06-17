@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { crawlController as crawlControllerV2 } from "../v2/crawl";
 import { mapController as mapControllerV2 } from "../v2/map";
 
@@ -14,8 +15,8 @@ const resetEnv = (key: "DISABLE_CRAWL" | "DISABLE_MAP", value: string | undefine
 
 const mockResponse = () => {
   const res: any = {};
-  res.status = jest.fn().mockReturnValue(res);
-  res.json = jest.fn().mockReturnValue(res);
+  res.status = vi.fn().mockReturnValue(res);
+  res.json = vi.fn().mockReturnValue(res);
   return res;
 };
 
