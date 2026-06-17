@@ -15,7 +15,7 @@ refresh onto upstream `master`.
 | `combined` | Deployed integration branch = `upstream/main` + the still-relevant patches below. The running stack (`/opt/firecrawl`) builds its `firecrawl-combined` image from this branch's working tree. |
 | `combined-pre-refresh` | The previous integration state (Nov 2025), kept as a branch for convenience. |
 | tag `archive/combined-2025-11-pre-refresh` | Immutable snapshot of the pre-refresh `combined` — preserves **every** original patch commit, including the ones we have since dropped. Nothing is ever lost. |
-| `feat/anti-bot-playwright` | Anti-fingerprinting patch re-applied cleanly onto fresh upstream. **Not deployed** (the stack uses the stock `ghcr.io/firecrawl/playwright-service` image); kept ready for future use. |
+| `feat/anti-bot-playwright` | Anti-fingerprinting patch re-applied onto fresh upstream (adapted to the new scrape flow). **Not deployed** (the stack uses the stock `ghcr.io/firecrawl/playwright-service` image); kept ready for future use. |
 
 To recover any original patch as authored, check out the archive tag:
 `git show archive/combined-2025-11-pre-refresh` / `git log archive/combined-2025-11-pre-refresh`.
@@ -81,9 +81,12 @@ open-source Playwright microservice (`apps/playwright-service-ts/api.ts`).
   `apps/playwright-service-ts` and point compose at it.
 - The original commits dragged in junk root docs (`IMPLEMENTATION_SUMMARY.md`,
   `QUICK_START_ANTI_BOT.md`) and `test-anti-detection.js` — these are **not** carried forward.
+- **Adaptation on the re-applied branch:** uses Playwright-native `page.addInitScript` (placed
+  after page creation, before navigation) instead of the original `page.evaluateOnNewDocument`,
+  whose call site no longer exists in the rewritten `/scrape` flow.
 - **Compat risk to validate before deploying:** `puppeteer-extra-plugin-stealth` is bridged via
-  `playwright-extra`; confirm its `evaluateOnNewDocument` shim works on upstream's current
-  Playwright version.
+  `playwright-extra`; confirm the bridge works on upstream's Playwright 1.58. The branch is
+  **untested** (not built or deployed).
 
 ---
 
