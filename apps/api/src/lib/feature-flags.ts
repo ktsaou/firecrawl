@@ -21,7 +21,7 @@ export function isMapDisabled(): boolean {
 
 export function featureDisabledBody(feature: DisableableFeature) {
   return {
-    success: false,
+    success: false as const,
     error: `${featureNames[feature]} endpoint disabled by server configuration`,
   };
 }
