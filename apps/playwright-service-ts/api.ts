@@ -1,5 +1,7 @@
 import express, { Request, Response } from 'express';
-import { chromium, Browser, BrowserContext, Route, Request as PlaywrightRequest, Page } from 'playwright';
+import { Browser, BrowserContext, Route, Request as PlaywrightRequest, Page } from 'playwright';
+import { chromium } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import dotenv from 'dotenv';
 import UserAgent from 'user-agents';
 import { getError } from './helpers/get_error';
@@ -182,6 +184,9 @@ interface UrlModel {
 
 let browser: Browser;
 
+// Anti-fingerprinting: route Playwright through playwright-extra + stealth plugin
+chromium.use(StealthPlugin());
+
 const initializeBrowser = async () => {
   browser = await chromium.launch({
     headless: true,
@@ -192,7 +197,11 @@ const initializeBrowser = async () => {
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
-      '--disable-gpu'
+      '--disable-gpu',
+      // Anti-detection launch args
+      '--disable-blink-features=AutomationControlled',
+      '--disable-features=IsolateOrigins,site-per-process',
+      '--disable-features=VizDisplayCompositor'
     ]
   });
 };
@@ -209,6 +218,13 @@ const createContext = async (skipTlsVerification: boolean = false, userAgentOver
     viewport,
     ignoreHTTPSErrors: skipTlsVerification,
     serviceWorkers: 'block',
+    // Additional anti-detection context options
+    locale: 'en-US',
+    timezoneId: 'America/New_York',
+    permissions: [],
+    extraHTTPHeaders: {
+      'Accept-Language': 'en-US,en;q=0.9',
+    },
   };
 
   if (PROXY_SERVER && PROXY_USERNAME && PROXY_PASSWORD) {
@@ -412,6 +428,23 @@ app.post('/scrape', async (req: Request, res: Response) => {
     requestContext = contextBundle.context;
     securityState = contextBundle.securityState;
     page = await requestContext.newPage();
+
+    // Anti-fingerprinting: spoof automation indicators before any navigation.
+    // Playwright-native equivalent of puppeteer's evaluateOnNewDocument (relocated
+    // to after page creation; original PR #2282 placement no longer exists upstream).
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      (window as any).chrome = { runtime: {} };
+      const originalQuery = window.navigator.permissions.query;
+      window.navigator.permissions.query = function (parameters: any) {
+        if (parameters.name === 'notifications') {
+          return Promise.resolve({ state: Notification.permission } as PermissionStatus);
+        }
+        return originalQuery.call(window.navigator.permissions, parameters);
+      } as typeof window.navigator.permissions.query;
+    });
 
     if (headers) {
       // Remove the user-agent key before calling setExtraHTTPHeaders since
